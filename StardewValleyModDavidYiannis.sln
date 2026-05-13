@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StardewValleyMod-DavidYiannis", "StardewValleyMod-DavidYiannis.csproj", "{025D32BA-2FE2-4BC6-BCF9-61384EAD277F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StardewValleyModDavidYiannis", "StardewValleyModDavidYiannis.csproj", "{025D32BA-2FE2-4BC6-BCF9-61384EAD277F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
