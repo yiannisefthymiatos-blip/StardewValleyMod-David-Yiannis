@@ -2,9 +2,9 @@
   "Name": "StardewValleyModDavidYiannis",
   "Author": "David + Yiannis",
   "Version": "1.0.0",
-  "Description": "<One or two sentences about the mod>",
-  "UniqueID": "<your name>.<your project name>",
-  "EntryDll": "<your project name>.dll",
+  "Description": "<This mod creates 2 Iron Man items. The first is a hat (iron man's mask) which gives increased stats to the player (speed, stamina, etc.), and the second is a weapon which can shoot lazers, cutting down trees, mining rocks, and damaging monsters. >",
+  "UniqueID": "David + Yiannis.StardewValleyModDavidYiannis",
+  "EntryDll": "StardewValleyModDavidYiannis.dll",
   "MinimumApiVersion": "4.0.0",
   "UpdateKeys": []
 }
