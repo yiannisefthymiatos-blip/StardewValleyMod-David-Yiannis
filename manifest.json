@@ -2,7 +2,7 @@
   "Name": "StardewValleyModDavidYiannis",
   "Author": "David-Yiannis",
   "Version": "1.0.0",
-  "Description": "<This mod creates 2 Iron Man items. The first is a hat (iron man's mask) which gives increased stats to the player (speed, stamina, etc.), and the second is a weapon which can shoot lazers, cutting down trees, mining rocks, and damaging monsters. >",
+  "Description": "Suit up as Iron Man. Toggle the Mark VI suit for speed/stamina/health buffs, fire repulsor blasts that damage enemies and break terrain, and engage flight mode. Features a JARVIS HUD with arc reactor energy bar.",
   "UniqueID": "David-Yiannis.StardewValleyModDavidYiannis",
   "EntryDll": "StardewValleyModDavidYiannis.dll",
   "MinimumApiVersion": "4.0.0",
