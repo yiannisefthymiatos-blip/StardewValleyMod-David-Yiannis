@@ -407,3 +407,4 @@ namespace StardewValleyModDavidYiannis
         public bool Value { get; set; }
     }
 }
+//presentation ready
