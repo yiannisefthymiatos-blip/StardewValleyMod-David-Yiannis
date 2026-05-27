@@ -4,13 +4,21 @@ using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Objects;
+using StardewValley.GameData.CraftingRecipes;
+using StardewValley.Menus;
+using System.Collections.Generic;
 
 namespace StardewValleyModDavidYiannis
 {
-    internal sealed class ModEntry : Mod
+    internal sealed class MTodEntry : Mod
     {
         private IModHelper _helper = null!;
-
+        //need a battery pack - vanilla item 787 - to make the reactor
+        private const string ArcReactorItemId = "(O)787"; // battery pack
+        private const string ArcReactorRecipeId = "ArcReactor";
+        private bool reactorInstalled = false; // consumed on first suit-up
+        
         // ── Suit state ────────────────────────────────────────────────────────
         private bool suitActive = false;
         private bool flightActive = false;
@@ -29,11 +37,11 @@ namespace StardewValleyModDavidYiannis
         // ── JARVIS idle quips ─────────────────────────────────────────────────
         private static readonly string[] IdleQuips =
         {
-            "JARVIS: All systems nominal, sir.",
-            "JARVIS: Arc reactor output stable.",
-            "JARVIS: No threats detected in the vicinity.",
-            "JARVIS: Structural integrity at 100%.",
-            "JARVIS: Shall I compile a status report?",
+            "All systems nominal, sir.",
+            "Arc reactor output stable.",
+            "No threats detected in the vicinity.",
+            "Structural integrity at 100%.",
+            "Shall I compile a status report?",
         };
         private int quipTimer = 0;
         private readonly Random rng = new();
@@ -45,12 +53,29 @@ namespace StardewValleyModDavidYiannis
             _helper = helper;
             helper.Events.Input.ButtonPressed += OnButtonPressed;
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+            helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.Display.RenderedHud += OnRenderedHud;
+            helper.Events.Content.AssetRequested += OnAssetRequested;
             helper.Events.Player.Warped += OnWarped;
-
-            Monitor.Log("Iron Man mod loaded. Press [F] to suit up.", LogLevel.Info);
+            
+         
+            Monitor.Log("Iron Man mod loaded. Craft an Arc Reactor (battery pack) and press [F] to suit up.", LogLevel.Info);
         }
-
+        
+        private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
+        {
+            if (e.NameWithoutLocale.IsEquivalentTo("Data/CraftingRecipes"))
+            {
+                e.Edit(asset =>
+                {
+                    var data = asset.AsDictionary<string, string>().Data;
+                    // Key   = recipe display name shown in crafting menu
+                    // Value = "ingredient1 qty ingredient2 qty .../Field/resultID/isBigCraft/conditions"
+                    data["Arc Reactor"] = "334 5 336 2 338 1/Field/787/false/null";
+                });
+            }
+        }
+        
         // ── Input ─────────────────────────────────────────────────────────────
 
         private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
