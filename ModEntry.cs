@@ -5,9 +5,6 @@ using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Objects;
-using StardewValley.GameData.CraftingRecipes;
-using StardewValley.Menus;
-using System.Collections.Generic;
 
 namespace StardewValleyModDavidYiannis
 {
@@ -56,7 +53,6 @@ namespace StardewValleyModDavidYiannis
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.Display.RenderedHud += OnRenderedHud;
             helper.Events.Content.AssetRequested += OnAssetRequested;
-            helper.Events.Player.Warped += OnWarped;
             
          
             Monitor.Log("Iron Man mod loaded. Craft an Arc Reactor (battery pack) and press [F] to suit up.", LogLevel.Info);
@@ -78,16 +74,17 @@ namespace StardewValleyModDavidYiannis
         //this makes the recipe a thing
         private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
         {
-            reactorInstalled = _helper.Data.ReadSaveData<bool>("reactorInstalled");
+            // Restore persisted state
+            reactorInstalled = _helper.Data.ReadSaveData<SaveData>("reactorInstalled")?.Value ?? false;
 
-            // unlock the crafting recipe for the player if they don't have it yet
+            // Unlock the crafting recipe for the player if they don't have it yet
             if (!Game1.player.craftingRecipes.ContainsKey("Arc Reactor"))
             {
                 Game1.player.craftingRecipes.Add("Arc Reactor", 0);
                 Jarvis("New blueprint unlocked: Arc Reactor. Check your crafting menu.", HUDMessage.newQuest_type);
             }
-        } 
-        // ── Input ─────────────────────────────────────────────────────────────
+        }
+ // ── Input ─────────────────────────────────────────────────────────────
 
         private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
         {
@@ -95,7 +92,7 @@ namespace StardewValleyModDavidYiannis
 
             switch (e.Button)
             {
-                case SButton.F:
+                case SButton.Z:
                     ToggleSuit();
                     break;
                 case SButton.G when suitActive:
@@ -111,18 +108,37 @@ namespace StardewValleyModDavidYiannis
 
         private void ToggleSuit()
         {
-            suitActive = !suitActive;
-
-            if (suitActive)
+            if (!suitActive)
             {
+                // Turning ON — need the Arc Reactor item if not yet installed
+                if (!reactorInstalled)
+                {
+                    if (!PlayerHasItem(ArcReactorItemId))
+                    {
+                        Jarvis("Arc Reactor not found. Craft one first: 5 Iron Bar + 2 Gold Bar + 1 Refined Quartz.", HUDMessage.health_type);
+                        return;
+                    }
+
+                    // Consume the Battery Pack (Arc Reactor) from inventory
+                    RemoveItemFromInventory(ArcReactorItemId);
+                    reactorInstalled = true;
+                    _helper.Data.WriteSaveData("reactorInstalled", new SaveData { Value = true });
+                    Jarvis("Arc Reactor installed. Initialising J.A.R.V.I.S. framework...", HUDMessage.newQuest_type);
+                    Game1.playSound("cowboy_gunload");
+                }
+
+                suitActive = true;
                 arcEnergy = MaxEnergy;
                 Game1.player.temporarySpeedBuff = 2f;
                 Jarvis("Welcome back, sir. Suit online. All systems go.", HUDMessage.newQuest_type);
-                Game1.playSound("cowboy_monsterkilled");
+                if (reactorInstalled)
+                    Game1.playSound("cowboy_gunload");
             }
             else
             {
+                // Turning OFF
                 if (flightActive) DeactivateFlight();
+                suitActive = false;
                 Game1.player.temporarySpeedBuff = 0f;
                 Jarvis("Powering down. Have a good evening, sir.", HUDMessage.stamina_type);
                 Game1.playSound("coin");
@@ -131,7 +147,7 @@ namespace StardewValleyModDavidYiannis
 
         private void ToggleFlight()
         {
-            if (arcEnergy < 15f)
+            if (!flightActive && arcEnergy < 15f)
             {
                 Jarvis("Insufficient arc reactor energy for flight.", HUDMessage.health_type);
                 return;
@@ -141,7 +157,7 @@ namespace StardewValleyModDavidYiannis
 
             if (flightActive)
             {
-                Game1.player.temporarySpeedBuff = 2f;
+                Game1.player.temporarySpeedBuff = 5f; // faster than walking while airborne
                 Jarvis("Repulsor thrusters engaged.", HUDMessage.newQuest_type);
                 Game1.playSound("crystal");
             }
@@ -158,7 +174,6 @@ namespace StardewValleyModDavidYiannis
             Jarvis("Thrusters offline. Landing sequence complete.", HUDMessage.stamina_type);
         }
 
-        // Setting Position each tick after the game's own movement code runs bypasses collision.
         private void HandleFlightMovement()
         {
             const float speed = 8f;
@@ -191,12 +206,9 @@ namespace StardewValleyModDavidYiannis
             arcEnergy -= RepulsorCost;
             repulsorCooldown = RepulsorCooldownMax;
 
-            Vector2 blastTile = FacingTile(2);
-
-            // Explosion damages monsters, breaks rocks/trees/objects
+            Vector2 blastTile = FacingTile(4);
             Game1.currentLocation.explode(blastTile, 2, Game1.player);
 
-            // Visual flash at blast site
             Game1.currentLocation.temporarySprites.Add(new TemporaryAnimatedSprite(
                 "TileSheets\\animations",
                 new Rectangle(0, 320, 64, 64),
@@ -213,10 +225,10 @@ namespace StardewValleyModDavidYiannis
             Vector2 t = Game1.player.Tile;
             return Game1.player.FacingDirection switch
             {
-                0 => new Vector2(t.X, t.Y - tiles),  // up
-                1 => new Vector2(t.X + tiles, t.Y),  // right
-                2 => new Vector2(t.X, t.Y + tiles),  // down
-                3 => new Vector2(t.X - tiles, t.Y),  // left
+                0 => new Vector2(t.X, t.Y - tiles),
+                1 => new Vector2(t.X + tiles, t.Y),
+                2 => new Vector2(t.X, t.Y + tiles),
+                3 => new Vector2(t.X - tiles, t.Y),
                 _ => t
             };
         }
@@ -227,13 +239,10 @@ namespace StardewValleyModDavidYiannis
         {
             if (!Context.IsWorldReady || !suitActive) return;
 
-            // Flight movement — overrides game collision by setting position after game logic runs
             if (flightActive) HandleFlightMovement();
 
-            // Repulsor cooldown
             if (repulsorCooldown > 0) repulsorCooldown--;
 
-            // Arc reactor energy
             if (flightActive)
             {
                 arcEnergy = Math.Max(0f, arcEnergy - FlightDrain);
@@ -249,15 +258,12 @@ namespace StardewValleyModDavidYiannis
                 arcEnergy = Math.Min(MaxEnergy, arcEnergy + EnergyRegen);
             }
 
-            // Suit handles exertion — regen stamina
             if (e.IsMultipleOf(2))
                 Game1.player.Stamina = Math.Min(Game1.player.MaxStamina, Game1.player.Stamina + 1f);
 
-            // Nanite repair — passive health regen once per second
             if (e.IsMultipleOf(60) && Game1.player.health < Game1.player.maxHealth)
                 Game1.player.health = Math.Min(Game1.player.maxHealth, Game1.player.health + 1);
 
-            // Occasional JARVIS idle quip (~every 30 s)
             quipTimer++;
             if (quipTimer >= 1800)
             {
@@ -267,41 +273,50 @@ namespace StardewValleyModDavidYiannis
             }
         }
 
-        private void OnWarped(object? sender, WarpedEventArgs e) { }
-
         // ── HUD ───────────────────────────────────────────────────────────────
 
         private void OnRenderedHud(object? sender, RenderedHudEventArgs e)
         {
-            if (!Context.IsWorldReady || !suitActive) return;
+            if (!Context.IsWorldReady) return;
+
+            // Show "craft Arc Reactor" hint if reactor not yet installed
+            if (!reactorInstalled && !suitActive)
+            {
+                DrawString(
+                    e.SpriteBatch,
+                    "[ IRON MAN ] Craft an Arc Reactor to suit up  (5 Iron Bar + 2 Gold Bar + 1 Refined Quartz)",
+                    new Vector2(16, Game1.uiViewport.Height - 40),
+                    new Color(0, 160, 255, 180)
+                );
+                return;
+            }
+
+            if (!suitActive) return;
             DrawHud(e.SpriteBatch);
         }
 
         private void DrawHud(SpriteBatch b)
         {
-            const int barW  = 200;
-            const int barH  = 18;
-            const int rowH  = 26;
-            const int padX  = 12;
-            const int padY  = 10;
+            const int barW = 200;
+            const int barH = 18;
+            const int rowH = 26;
+            const int padX = 12;
+            const int padY = 10;
 
             int panelX = 16;
             int panelY = Game1.uiViewport.Height - 205;
             int panelW = barW + padX * 2 + 20;
             int panelH = 190;
 
-            // Background panel
             DrawRect(b, new Rectangle(panelX, panelY, panelW, panelH), new Color(0, 10, 30, 190));
             DrawBorder(b, new Rectangle(panelX, panelY, panelW, panelH), new Color(0, 160, 255, 220), 2);
 
             int x = panelX + padX;
             int y = panelY + padY;
 
-            // Header
             DrawString(b, "[ STARK INDUSTRIES - MARK VI ]", new Vector2(x, y), new Color(0, 200, 255));
             y += rowH;
 
-            // Arc Reactor bar
             DrawString(b, "ARC REACTOR", new Vector2(x, y), new Color(0, 160, 255));
             y += 18;
             DrawBar(b, new Rectangle(x, y, barW, barH), arcEnergy / MaxEnergy,
@@ -309,7 +324,6 @@ namespace StardewValleyModDavidYiannis
             DrawString(b, $"{(int)arcEnergy}%", new Vector2(x + barW + 6, y - 1), Color.White);
             y += rowH;
 
-            // Suit Integrity bar
             float hp = (float)Game1.player.health / Game1.player.maxHealth;
             DrawString(b, "SUIT INTEGRITY", new Vector2(x, y), new Color(0, 160, 255));
             y += 18;
@@ -318,13 +332,11 @@ namespace StardewValleyModDavidYiannis
             DrawString(b, $"{Game1.player.health}/{Game1.player.maxHealth}", new Vector2(x + barW + 6, y - 1), Color.White);
             y += rowH;
 
-            // Flight status
             string flightLabel = flightActive ? "FLIGHT   [ ACTIVE  ]" : "FLIGHT   [ OFFLINE ]";
             Color flightCol    = flightActive ? new Color(0, 230, 120) : new Color(200, 80, 0);
             DrawString(b, flightLabel, new Vector2(x, y), flightCol);
             y += rowH - 4;
 
-            // Repulsor status
             string repLabel = repulsorCooldown > 0
                 ? $"REPULSOR [ CHARGING {(RepulsorCooldownMax - repulsorCooldown) * 100 / RepulsorCooldownMax}% ]"
                 : "REPULSOR [ READY   ]";
@@ -332,8 +344,7 @@ namespace StardewValleyModDavidYiannis
             DrawString(b, repLabel, new Vector2(x, y), repCol);
             y += rowH - 4;
 
-            // Key hint footer
-            DrawString(b, "[F] Suit    [G] Flight    [R] Repulsor", new Vector2(x, y), new Color(100, 100, 100));
+            DrawString(b, "[Z] Suit    [G] Flight    [R] Repulsor", new Vector2(x, y), new Color(100, 100, 100));
         }
 
         // ── Draw helpers ──────────────────────────────────────────────────────
@@ -350,10 +361,10 @@ namespace StardewValleyModDavidYiannis
 
         private static void DrawBorder(SpriteBatch b, Rectangle r, Color c, int t)
         {
-            b.Draw(Game1.staminaRect, new Rectangle(r.X,          r.Y,           r.Width, t),        c);
-            b.Draw(Game1.staminaRect, new Rectangle(r.X,          r.Bottom - t,  r.Width, t),        c);
-            b.Draw(Game1.staminaRect, new Rectangle(r.X,          r.Y,           t,       r.Height), c);
-            b.Draw(Game1.staminaRect, new Rectangle(r.Right - t,  r.Y,           t,       r.Height), c);
+            b.Draw(Game1.staminaRect, new Rectangle(r.X,         r.Y,          r.Width, t),        c);
+            b.Draw(Game1.staminaRect, new Rectangle(r.X,         r.Bottom - t, r.Width, t),        c);
+            b.Draw(Game1.staminaRect, new Rectangle(r.X,         r.Y,          t,       r.Height), c);
+            b.Draw(Game1.staminaRect, new Rectangle(r.Right - t, r.Y,          t,       r.Height), c);
         }
 
         private static void DrawString(SpriteBatch b, string text, Vector2 pos, Color c)
@@ -362,9 +373,37 @@ namespace StardewValleyModDavidYiannis
             b.DrawString(Game1.smallFont, text, pos, c);
         }
 
+        // ── Inventory helpers ─────────────────────────────────────────────────
+
+        private static bool PlayerHasItem(string qualifiedItemId)
+        {
+            foreach (var item in Game1.player.Items)
+                if (item?.QualifiedItemId == qualifiedItemId) return true;
+            return false;
+        }
+
+        private static void RemoveItemFromInventory(string qualifiedItemId)
+        {
+            for (int i = 0; i < Game1.player.Items.Count; i++)
+            {
+                var item = Game1.player.Items[i];
+                if (item?.QualifiedItemId != qualifiedItemId) continue;
+
+                if (item.Stack > 1) { item.Stack--; }
+                else                { Game1.player.Items[i] = null; }
+                return;
+            }
+        }
+
         // ── Utility ───────────────────────────────────────────────────────────
 
         private static void Jarvis(string message, int type) =>
             Game1.addHUDMessage(new HUDMessage($"JARVIS: {message}", type));
+    }
+
+    // Wrapper needed because WriteSaveData requires a serializable class, not a primitive
+    internal class SaveData
+    {
+        public bool Value { get; set; }
     }
 }
