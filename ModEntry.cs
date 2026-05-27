@@ -75,7 +75,18 @@ namespace StardewValleyModDavidYiannis
                 });
             }
         }
-        
+        //this makes the recipe a thing
+        private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
+        {
+            reactorInstalled = _helper.Data.ReadSaveData<bool>("reactorInstalled");
+
+            // unlock the crafting recipe for the player if they don't have it yet
+            if (!Game1.player.craftingRecipes.ContainsKey("Arc Reactor"))
+            {
+                Game1.player.craftingRecipes.Add("Arc Reactor", 0);
+                Jarvis("New blueprint unlocked: Arc Reactor. Check your crafting menu.", HUDMessage.newQuest_type);
+            }
+        } 
         // ── Input ─────────────────────────────────────────────────────────────
 
         private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
